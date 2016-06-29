@@ -1,0 +1,264 @@
+<%@page import="com.kineticdata.bundles.Json"%>
+<%@page import="com.kineticdata.core.bridging.Count"%>
+<%@page import="com.kineticdata.core.bridging.Record"%>
+<%@page import="com.kineticdata.core.bridging.RecordList"%>
+<%@page import="org.apache.http.client.HttpClient"%>
+<%@page import="org.apache.http.client.methods.HttpPut"%>
+<%@page import="org.apache.http.client.utils.URLEncodedUtils"%>
+<%@page import="org.apache.http.entity.StringEntity"%>
+<%@page import="org.apache.http.HttpResponse"%>
+<%@page import="org.apache.http.impl.cookie.BasicClientCookie"%>
+<%@page import="org.apache.http.impl.client.BasicCookieStore"%>
+<%@page import="org.apache.http.impl.client.HttpClientBuilder"%>
+<%@page import="org.apache.http.message.BasicNameValuePair"%>
+<%@page import="org.apache.http.NameValuePair"%>
+<%@page import="org.apache.http.util.EntityUtils"%>
+<%!
+
+    public static class LockableSubmissionHelper {
+        
+        /*------------------------------------------------------------------------------------------
+         * CONSTRUCTOR
+         *----------------------------------------------------------------------------------------*/
+        
+        private HttpServletRequest request;
+        private Bundle bundle;
+        private BundleSubmissionComponent submissionComponent;
+        private Identity identity;
+        private Kapp kapp;
+        
+        private String delegationAttribute;
+        private String groupAttribute;
+
+        public LockableSubmissionHelper(HttpServletRequest request) {
+            this.request = request;
+            this.bundle = (Bundle)request.getAttribute("bundle");
+            this.submissionComponent = (BundleSubmissionComponent)request.getAttribute("Submissions");
+            this.identity = (Identity)request.getAttribute("identity");
+            this.kapp = (Kapp)request.getAttribute("kapp");
+        }
+        
+        /*------------------------------------------------------------------------------------------
+         * CONFIGURATION METHODS
+         *----------------------------------------------------------------------------------------*/
+        
+        public LockableSubmissionHelper setDelegationAttribute(String attributeName) {
+            this.delegationAttribute = attributeName;
+            return this;
+        }
+        
+        public LockableSubmissionHelper setGroupAttribute(String attributeName) {
+            this.groupAttribute = attributeName;
+            return this;
+        }
+        
+        /*------------------------------------------------------------------------------------------
+         * METHODS
+         *----------------------------------------------------------------------------------------*/
+        
+        public LockableSubmission lock(String id, String until) throws Exception {
+            // Retrieve the lockable submission
+            LockableSubmission result = retrieve(id);
+            // If the result is in draft and is not locked (or is locked by the current user)
+            if (
+                "Draft".equals(result.getSubmission().getCoreState()) 
+                && (
+                    !result.isLocked()
+                    || identity.getUsername().equals(result.getLockedBy())
+                )
+            ) {
+                // Make a rest call to set the lock values
+                Map<String,Object> values = new HashMap<>();
+                values.put("Locked By", identity.getUsername());
+                values.put("Locked Until", until);
+                // Execute the update call
+                updateSubmission(result.getSubmission().getId(), values);
+                // Update the result values
+                result.getSubmission().putValues(values);
+            }
+            // Return the result
+            return result;
+        }
+        
+        public LockableSubmission retrieve(String id) {
+            LockableSubmission result = null;
+            Submission submission = submissionComponent.retrieve(id);
+            if (submission != null) {
+                result = new LockableSubmission(submission);
+            }
+            return result;
+        }
+        
+        public List<LockableSubmission> search(String type) {
+            // Declare the results
+            List<LockableSubmission> results = new ArrayList<>();
+            
+            // Raise intelligent errors
+            if (groupAttribute != null && kapp.getSpace().getUserAttributeDefinition(groupAttribute) == null) {
+                throw new IllegalStateException("The bundle is configured to use the \""+
+                    groupAttribute+"\" attribute for determining \""+type+"\" groups but "+
+                    "there is not a corresponding user attribute definition in the \""+
+                    kapp.getSpace().getName()+"\" space.");
+            }
+            // Raise intelligent errors
+            if (delegationAttribute != null && kapp.getSpace().getUserAttributeDefinition(delegationAttribute) == null) {
+                throw new IllegalStateException("The bundle is configured to use the \""+
+                    delegationAttribute+"\" attribute for determining \""+type+"\" delegation but "+
+                    "there is not a corresponding user attribute definition in the \""+
+                    kapp.getSpace().getName()+"\" space.");
+            }
+            
+            // Build the list of groups that the user is in
+            List<String> groups = new ArrayList<>();
+            if (groupAttribute == null) {
+                groups.addAll(identity.getGroups());
+            } else if (groupAttribute != null) {
+                groups.addAll(identity.getAttributeValues(groupAttribute));
+            }
+            // Build the list of individuals that this user represents
+            List<String> individuals = new ArrayList<>();
+            individuals.add(identity.getUsername());
+            if (delegationAttribute != null) {
+                individuals.addAll(identity.getAttributeValues(delegationAttribute));
+            }
+            
+            // Prepare the query string
+            StringBuffer query = new StringBuffer();
+            if (groups.size() > 0) {
+                query.append("(values[Assigned Group] IN (");
+                query.append(toValuesListString(groups));
+                query.append(") AND values[Assigned Individual]=null) OR ");
+            }
+            query.append("values[Assigned Individual] IN (");
+            query.append(toValuesListString(individuals));
+            query.append(")");
+            bundle.getLogger().info(query.toString());
+            // Prepare the search options
+            Map<String,String[]> searchOptions = new HashMap<>();
+            searchOptions.put("coreState", new String[] {"Draft"});
+            searchOptions.put("type", new String[] {type});
+            searchOptions.put("q", new String[] {query.toString()});
+            // Execute the search
+            List<Submission> submissions = submissionComponent.searchByKapp(kapp, searchOptions);
+            
+            // Prepare the results
+            for (Submission submission : submissions) {
+                results.add(new LockableSubmission(submission));
+            }
+            // Return the results
+            return results;
+        }
+        
+        /*------------------------------------------------------------------------------------------
+         * HELPER METHODS
+         *--------------------------------------------------------------------------------------------*/
+        
+        private Map<String,Object> updateSubmission(UUID id, Map<String,Object> values) throws Exception {
+            // Build the URL
+            StringBuilder url = new StringBuilder();
+            url.append(request.getScheme()).append("://").append(request.getServerName());
+            if (request.getServerPort() != 80 && request.getServerPort() != 443) {
+                url.append(":").append(request.getServerPort());
+            }
+            url.append(bundle.getApiLocation()).append("/submissions/").append(id.toString());
+            if (false) {
+                throw new RuntimeException(url.toString());
+            }
+            // Set request
+            HttpPut resourceRequest = new HttpPut(url.toString());
+            // Add headers
+            resourceRequest.addHeader("Accept", "application/json");
+            resourceRequest.addHeader("Content-Type", "application/json");
+            // Set the body content
+            Map<String,Object> data = new HashMap<>();
+            data.put("values", values);
+            StringEntity entity = new StringEntity(Json.toString(data), "UTF-8");
+            entity.setContentType("application/json");
+            resourceRequest.setEntity(entity);
+            // Set client
+            BasicCookieStore cookieStore = new BasicCookieStore(); 
+            for (Cookie cookie : request.getCookies()) {
+                BasicClientCookie basicClientCookie = 
+                    new BasicClientCookie(cookie.getName(), cookie.getValue());
+                basicClientCookie.setDomain(request.getServerName());
+                cookieStore.addCookie(basicClientCookie);
+            }
+            HttpClient httpClient = HttpClientBuilder.create()
+                .setDefaultCookieStore(cookieStore)
+                .build();
+            // Make request
+            HttpResponse response = httpClient.execute(resourceRequest);
+            // Throw error if response is not 200
+            if (response.getStatusLine().getStatusCode() != 200){
+                throw new RuntimeException("Failed: HTTP Error Code: " + 
+                    response.getStatusLine().getStatusCode());
+            }
+            // Retrieve the response body
+            String responseBody = EntityUtils.toString(response.getEntity());
+            // Return the parsed JSON
+            return (Map<String,Object>)Json.parse(responseBody);
+        }
+        
+        private String toValuesListString(List<String> values) {
+            StringBuilder buffer = new StringBuilder();
+            for (String value : values) {
+                if (buffer.length() != 0) {
+                    buffer.append(", ");
+                }
+                buffer.append("\"").append(value).append("\"");
+            }
+            return buffer.toString();
+        }
+        
+        
+        /*------------------------------------------------------------------------------------------
+         * HELPER MODELS
+         *----------------------------------------------------------------------------------------*/
+        
+        public static class LockableSubmission {
+
+            private Submission submission;
+
+            public LockableSubmission(Submission submission) {
+                this.submission = submission;
+            }
+
+            public List<String> getAssignedGroups() {
+                return submission.getForm().getField("Assigned Group").isComplexDataType()
+                    ? (List)Json.parse(submission.getValue("Assigned Group"))
+                    : Arrays.asList(submission.getValue("Assigned Group"));
+            }
+
+            public List<String> getAssignedIndividuals() {
+                return submission.getForm().getField("Assigned Individual").isComplexDataType()
+                    ? (List)Json.parse(submission.getValue("Assigned Individual"))
+                    : Arrays.asList(submission.getValue("Assigned Individual"));
+            }
+            
+            public String getLockedBy() {
+                return isLocked() ? submission.getValue("Locked By") : null;
+            }
+
+            public Date getLockedUntil() {
+                return isLocked() ? Date.from(Time.parse(submission.getValue("Locked Until"))) : null;
+            }
+
+            public Submission getSubmission() {
+                return submission;
+            }
+
+            public boolean isExpired() {
+                return Text.isNotEmpty(submission.getValue("Locked Until"))
+                    && Time.parse(submission.getValue("Locked Until")).isBefore(Time.now());
+            }
+
+            public boolean isLocked() {
+                return Text.isNotEmpty(submission.getValue("Locked By"))
+                    && !isExpired();
+            }
+
+        }
+        
+    }
+    
+%>

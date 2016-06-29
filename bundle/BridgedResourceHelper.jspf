@@ -1,0 +1,188 @@
+<%@page import="com.kineticdata.bundles.Text"%>
+<%@page import="com.kineticdata.bundles.Json"%>
+<%@page import="com.kineticdata.core.bridging.Count"%>
+<%@page import="com.kineticdata.core.bridging.Record"%>
+<%@page import="com.kineticdata.core.bridging.RecordList"%>
+<%@page import="org.apache.http.client.HttpClient"%>
+<%@page import="org.apache.http.client.methods.HttpGet"%>
+<%@page import="org.apache.http.client.utils.URLEncodedUtils"%>
+<%@page import="org.apache.http.HttpResponse"%>
+<%@page import="org.apache.http.impl.cookie.BasicClientCookie"%>
+<%@page import="org.apache.http.impl.client.BasicCookieStore"%>
+<%@page import="org.apache.http.impl.client.HttpClientBuilder"%>
+<%@page import="org.apache.http.message.BasicNameValuePair"%>
+<%@page import="org.apache.http.NameValuePair"%>
+<%@page import="org.apache.http.util.EntityUtils"%>
+<%! 
+    
+    public static class BridgedResourceHelper {
+        
+        private HttpServletRequest request;
+        private String kappLocation;
+        private String formSlug;
+        
+        public BridgedResourceHelper(HttpServletRequest request, String kappLocation, String formSlug) {
+            this.request = request;
+            this.kappLocation = kappLocation;
+            this.formSlug = formSlug;
+        }
+        
+        /*------------------------------------------------------------------------------------------
+         * UTILITY METHODS
+         *----------------------------------------------------------------------------------------*/
+        
+        public Map<String,String> map() {
+            return new LinkedHashMap<>();
+        }
+        
+        /*------------------------------------------------------------------------------------------
+         * METHODS
+         *----------------------------------------------------------------------------------------*/
+        
+        public Count count(String name) throws Exception {
+            return count(name, null);
+        }
+        
+        public Count count(String name, Map<String,String> values) throws Exception {
+            // Prepare the request parameters
+            Map<String,String> parameters = new LinkedHashMap<>();
+            if (values != null) {
+                for (Map.Entry<String,String> entry : values.entrySet()) {
+                    parameters.put("values["+entry.getKey()+"]", entry.getValue());
+                }
+            }
+            // Execute the request
+            Map<String,Object> response = request(name+"/count", parameters);
+            // Build the result
+            Integer value = (Integer)response.get("value");
+            Map<String,String> metadata = (Map)response.get("metadata");
+            // Return the result
+            return new Count(value, metadata);
+        }
+        
+        public Record retrieve(String name) throws Exception {
+            return retrieve(name, null);
+        }
+        
+        public Record retrieve(String name, Map<String,String> values) throws Exception {
+            // Prepare the request parameters
+            Map<String,String> parameters = new LinkedHashMap<>();
+            if (values != null) {
+                for (Map.Entry<String,String> entry : values.entrySet()) {
+                    parameters.put("values["+entry.getKey()+"]", entry.getValue());
+                }
+            }
+            // Execute the request
+            Map<String,Object> response = request(name, parameters);
+            // Build the result
+            Map<String,Object> record = (Map)response.get("record");
+            Map<String,String> attributes = (Map)record.get("attributes");
+            Map<String,String> metadata = (Map)record.get("metadata");
+            // Return the result
+            return new Record(attributes, metadata);
+        }
+        
+        public RecordList search(String name) throws Exception {
+            return search(name, null, null, null);
+        }
+        
+        public RecordList search(String name, Integer limit) throws Exception {
+            return search(name, null, limit, null);
+        }
+        
+        public RecordList search(String name, Integer limit, Integer offset) throws Exception {
+            return search(name, null, limit, offset);
+        }
+        
+        public RecordList search(String name, Map<String,String> values) throws Exception {
+            return search(name, values, null, null);
+        }
+        
+        public RecordList search(String name, Map<String,String> values, Integer limit) throws Exception {
+            return search(name, values, limit, null);
+        }
+        
+        public RecordList search(String name, Map<String,String> values, Integer limit, Integer offset) throws Exception {
+            // Prepare the request parameters
+            Map<String,String> parameters = new LinkedHashMap<>();
+            if (values != null) {
+                for (Map.Entry<String,String> entry : values.entrySet()) {
+                    parameters.put("values["+entry.getKey()+"]", entry.getValue());
+                }
+            }
+            if (limit != null) {
+                parameters.put("limit", String.valueOf(limit));
+            }
+            if (offset != null) {
+                parameters.put("offset", String.valueOf(offset));
+            }
+            // Execute the request
+            Map<String,Object> response = request(name, parameters);
+            // Build the result
+            Map<String,Object> responseObject = (Map)response.get("records");
+            List<String> attributeNames = (List)responseObject.get("fields");
+            Map<String,String> metadata = (Map)responseObject.get("metadata");
+            List<Record> records = new ArrayList<>();
+            for (List<String> attributeValues : (List<List<String>>)responseObject.get("records")) {
+                Map<String,String> attributes = new LinkedHashMap<>();
+                for (int i=0;i<attributeNames.size();i++) {
+                    attributes.put(attributeNames.get(i), attributeValues.get(i));
+                }
+                records.add(new Record(attributes));
+            }
+            // Return the result
+            return new RecordList(attributeNames.toArray(new String[attributeNames.size()]), records, metadata);
+        }
+        
+        /*------------------------------------------------------------------------------------------
+         * HELPER METHODS
+         *----------------------------------------------------------------------------------------*/
+        
+        private Map<String,Object> request(String name, Map<String,String> parameters) throws Exception {
+            // Build the URL
+            StringBuilder url = new StringBuilder();
+            url.append(request.getScheme()).append("://").append(request.getServerName());
+            if (request.getServerPort() != 80 && request.getServerPort() != 443) {
+                url.append(":").append(request.getServerPort());
+            }
+            url.append(kappLocation).append("/").append(formSlug).append("/bridgedResources/")
+                .append(Text.escapeUrlSegment(name));
+            // Append parameters
+            if (parameters.size() > 0) {
+                List<NameValuePair> urlParameters = new ArrayList<>();       
+                for(Map.Entry<String,String> entry : parameters.entrySet()) {
+                    urlParameters.add(new BasicNameValuePair(entry.getKey(), entry.getValue()));
+                }
+                url.append("?").append(URLEncodedUtils.format(urlParameters, "utf-8"));
+            }
+            // Set request
+            HttpGet resourceRequest = new HttpGet(url.toString());
+            // Add headers
+            resourceRequest.addHeader("Accept", "application/json");
+            resourceRequest.addHeader("Content-Type", "application/x-www-form-urlencoded");
+            // Set client
+            BasicCookieStore cookieStore = new BasicCookieStore(); 
+            for (Cookie cookie : request.getCookies()) {
+                BasicClientCookie basicClientCookie = 
+                    new BasicClientCookie(cookie.getName(), cookie.getValue());
+                basicClientCookie.setDomain(request.getServerName());
+                cookieStore.addCookie(basicClientCookie);
+            }
+            HttpClient httpClient = HttpClientBuilder.create()
+                .setDefaultCookieStore(cookieStore)
+                .build();
+            // Make request
+            HttpResponse response = httpClient.execute(resourceRequest);
+            // Throw error if response is not 200
+            if (response.getStatusLine().getStatusCode() != 200){
+                throw new RuntimeException("Failed: HTTP Error Code: " + response.getStatusLine().getStatusCode());
+            }
+            // Retrieve the response body
+            String responseBody = EntityUtils.toString(response.getEntity());
+            // Return the parsed JSON
+            return (Map<String,Object>)Json.parse(responseBody);
+        }
+        
+    }
+
+%>

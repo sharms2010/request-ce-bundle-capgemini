@@ -1,0 +1,205 @@
+<%-- Load Java libraries, Kinetic models & Identity --%>
+<%@page pageEncoding="UTF-8" trimDirectiveWhitespaces="true"%>
+<%@page import="com.kineticdata.core.models.*" %>
+<%@page import="com.kineticdata.core.web.bundles.Bundle" %>
+<%@page import="com.kineticdata.core.web.bundles.BundleSubmissionComponent" %>
+<%@page import="com.kineticdata.core.authentication.Identity" %>
+<%@page import="java.time.ZoneId"%>
+<%@page import="java.util.*" %>
+<%@page import="org.slf4j.Logger" %>
+
+<%-- Bundle Java libraries --%>
+<%@page import="com.kineticdata.bundles.*" %>
+
+<%-- Load tag libraries (JSTL) used in most bundles --%>
+<%@taglib prefix="c" uri="http://java.sun.com/jsp/jstl/core" %>
+<%@taglib prefix="fn" uri="http://java.sun.com/jsp/jstl/functions" %>
+<%@taglib prefix="fmt" uri="http://java.sun.com/jsp/jstl/fmt" %>
+<%@taglib prefix="app" uri="http://kineticdata.com/taglibs/core/app" %>
+<%@taglib prefix="bundle" uri="http://kineticdata.com/taglibs/bundle" %>
+<%@taglib prefix="json" uri="http://kineticdata.com/taglibs/json" %>
+
+<%@include file="/WEB-INF/app/includes/task4/task4.jspf" %>
+
+<%-- Initialize the default zoneId and locale --%>
+<%
+    request.setAttribute("zoneId", ZoneId.systemDefault());
+    request.setAttribute("locale", Locale.US);
+%>
+
+<%-- Get bundle, space, and kapp objects --%>
+<%
+    Bundle bundle = (Bundle)request.getAttribute("bundle"); 
+    Space space = (Space)request.getAttribute("space");
+    Kapp kapp = (Kapp)request.getAttribute("kapp");
+    Identity identity = (Identity)request.getAttribute("identity");
+%>
+
+<%-- Load helper(s) --%>
+<%
+    request.setAttribute("json", new com.kineticdata.bundles.JsonHelper());
+    request.setAttribute("text", new com.kineticdata.bundles.TextHelper());
+    request.setAttribute("time", new com.kineticdata.bundles.TimeHelper());
+%>
+
+<%-- SetupHelper --%>
+<%@include file="SetupHelper.jspf"%>
+<%
+    SetupHelper setupHelper = new SetupHelper(request);
+    request.setAttribute("SetupHelper", setupHelper);
+%>
+
+<%-- BridgedResourceHelper --%>
+<%@include file="BridgedResourceHelper.jspf" %>
+<%
+    // Add setup attributes
+    /*setupHelper
+        .addSetupAttribute(
+            "Shared Bridged Resource Form Slug", 
+            "The slug of the form that is used to define shared bridged resources.", 
+            false);
+    */
+    // If the request is scoped to a specific Kapp (space display pages are not)
+    if (kapp != null && kapp.hasAttribute("Shared Bridged Resource Form Slug")) {
+        // Initialize the LockableSubmissionHelper
+        request.setAttribute("BridgedResourceHelper", 
+            new BridgedResourceHelper(
+                request, 
+                bundle.getKappLocation(), 
+                kapp.getAttributeValue("Shared Bridged Resource Form Slug")));
+    }
+%>
+
+<%-- BundleHelper --%>
+<%@include file="BundleHelper.jspf"%>
+<%
+    request.setAttribute("BundleHelper", new BundleHelper(bundle, kapp, space));
+    /*setupHelper.addSetupAttribute("Header Navigation List", 
+        "JSON Attribute which defines the navigation links that should appear in the header. "
+            + "Structure must be a JSON Array of JSON Objects, with the properties Name (required), Kapp (optional), and Page (optional). "
+            + "Name defines the display text of the link. "
+            + "Kapp defines the slug of the destination Kapp (defaults to current Kapp). "
+            + "Page defines the filename of the destination page (defaults to Kapp's home page).", 
+        false);
+    */
+%>
+
+<%-- CatalogSearchHelper --%>
+<%@include file="CatalogSearchHelper.jspf"%>
+<%
+    request.setAttribute("CatalogSearchHelper", new CatalogSearchHelper());
+    //Add setup attributes
+    /*setupHelper
+        .addSetupAttribute("Search Attribute", 
+            "Specify which form attributes should be searchable. Keyword Attribute is always searchable and does not need to be specified as a Search Attribute. [Allows Multiple]", 
+            false)
+        .addSetupAttribute("Include in Global Search", 
+            "Set if the Kapp should use and participate in global search.", 
+            false); 
+    */
+%>
+
+<%-- CategoryHelper --%>
+<%@include file="CategoryHelper.jspf"%>
+<%
+    request.setAttribute("CategoryHelper", new CategoryHelper());
+%>
+
+<%-- FilehubHelper --%>
+<%@include file="FilehubHelper.jspf"%>
+<%
+    // Add the "Filehub Url" setup attribute
+    /*setupHelper
+        .addSetupAttribute(
+            "Filehub Url", 
+            "The URL to the Kinetic Filehub application (https://acme.com/kinetic-filehub)", 
+            request.getParameter("filestore") != null);
+    */
+    // Declare the filehubHelper, which is referenced in the router.jspf file
+    FilehubHelper filehubHelper = null;
+    // If the request is scoped to a specific Kapp (space display pages are not)
+    if (kapp != null && kapp.hasAttribute("Filehub Url")) {
+        // Initialize the filehub helper
+        filehubHelper = new FilehubHelper(kapp.getAttributeValue("Filehub Url"));
+
+        // Add the "Example" filestore setup attributes
+        /*setupHelper
+            .addSetupAttribute(
+                "Example Filestore Slug", 
+                "The slug of the desired filestore configured in Kinetic Filehub.", 
+                false)
+            .addSetupAttribute(
+                "Example Filestore Key", 
+                "The key for an access key associated to the specified filestore.", 
+                false)
+            .addSetupAttribute(
+                "Example Filestore Secret", 
+                "The secret associated to the specified key.", 
+                false);
+        */
+        // Initialize the "Example" filestore
+        if (kapp.hasAttribute("Example Filestore Slug")) {
+            filehubHelper.addFilestore(
+                kapp.getAttributeValue("Example Filestore Slug"),
+                kapp.getAttributeValue("Example Filestore Key"),
+                kapp.getAttributeValue("Example Filestore Secret"),
+                new FilehubHelper.Authorizer() {
+                    @Override public boolean canAccess(HttpServletRequest request) {
+                        return true;
+                    }
+                },
+                new FilehubHelper.PathBuilder() {
+                    @Override public String buildPath(HttpServletRequest request) {
+                        //return request.getParameter("path");
+                        String path = request.getParameter("form")+
+                            "/"+request.getParameter("entry")+
+                            "/"+request.getParameter("field");
+                        if (request.getParameter("filename") != null) {
+                            path += "/"+request.getParameter("filename");
+                        }
+                        return path;
+                    }
+                }
+            );
+        }
+    }
+%>
+
+<%-- LockableSubmissionHelper --%>
+<%@include file="LockableSubmissionHelper.jspf"%>
+<%
+    // Add setup attributes
+    /*setupHelper
+        .addSetupAttribute(
+            "Lockable Submission Delegation Attribute", 
+            "This should be set to the name of the User attribute definition that corresponds to "+
+                "assignment delegation, or left blank if delegation is not being used.", 
+            false)
+        .addSetupAttribute(
+            "Lockable Submission Group Attribute", 
+            "This should be set to the name of the User attribute definition that corresponds to "+
+                "groups, or left blank if groups are not being managed by User attributes.", 
+            false);
+    */
+    // If the request is scoped to a specific Kapp (space display pages are not)
+    if (kapp != null) {
+        // Initialize the LockableSubmissionHelper
+        LockableSubmissionHelper lockableSubmissionHelper = new LockableSubmissionHelper(request);
+        if (kapp.hasAttribute("Lockable Submission Delegation Attribute")) {
+            lockableSubmissionHelper.setDelegationAttribute(
+                kapp.getAttributeValue("Lockable Submission Delegation Attribute"));
+        }
+        if (kapp.hasAttribute("Lockable Submission Group Attribute")) {
+            lockableSubmissionHelper.setDelegationAttribute(
+                kapp.getAttributeValue("Lockable Submission Group Attribute"));
+        }
+        request.setAttribute("LockableSubmissionHelper", lockableSubmissionHelper);
+    }
+%>
+
+<%-- SubmissionHelper --%>
+<%@include file="SubmissionHelper.jspf"%>
+<%
+    request.setAttribute("SubmissionHelper", new SubmissionHelper(request));
+%>
+

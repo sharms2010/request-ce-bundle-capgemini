@@ -1,0 +1,109 @@
+/** Custom CSS **/
+/* Overrides for bootstrap */
+
+body {
+    background: white;
+}
+
+/* Headers */
+
+div.header-title {
+    text-align: center;
+}
+
+div.header-title h1 {
+    margin-top: 3px;
+}
+
+div.hamburger {
+    margin-left: 20px;
+    position: relative;
+    bottom: 0;
+}
+nav.subnav {
+    background-color: white;
+}
+nav.subnav.navbar-default .navbar-nav li {
+    margin-left: 2px;
+}
+nav.subnav.navbar-default .navbar-nav li.active {
+    border-bottom: 4px solid #7ac6ef;
+}
+nav.subnav.navbar-default .navbar-nav li.active a {
+    background: transparent;
+    color: #444;
+}
+nav.subnav.navbar-default .navbar-nav>li:hover {
+    border-bottom: 4px solid #7ac6ef;
+    z-index: 0;
+}
+
+h1, h2, h3, h4 ,h5 {
+    color: #777;
+}
+
+/* Tables */
+div.table-container h3, h3.table-header {
+    background: #b8dcf6;
+    border-top: 5px solid #7ac6ef;
+    padding: 15px 10px;
+    margin-bottom: 5px;
+    font-weight: normal;
+    color: #777;
+}
+
+table {
+    border: 1px solid #7ac6ef;
+}
+table thead {
+    background: #7ac6ef;
+    color: whitesmoke;
+}
+table thead th {
+    font-weight: normal;
+}
+
+.table-striped > tbody > tr:nth-of-type(odd) {
+    background-color: ;
+}
+
+.pagination > .active > a, .pagination > .active > span, 
+.pagination > .active > a:hover, .pagination > .active > span:hover, 
+.pagination > .active > a:focus, .pagination > .active > span:focus {
+    background-color: #7ac6ef;
+    border-color: #7ac6ef;
+}
+
+/* Cards */
+.card-action a {
+    color: #444;
+}
+.card-content {
+    min-height: 140px;
+}
+.card > *:not(.alert), .card-xxs > *:not(.alert), 
+.card-xs > *:not(.alert), .card-sm > *:not(.alert), 
+.card-md > *:not(.alert), .card-lg > *:not(.alert), 
+.card-xl > *:not(.alert), .card > .card-content:not(:last-child):after, 
+.card-xxs > .card-content:not(:last-child):after, 
+.card-xs > .card-content:not(:last-child):after, 
+.card-sm > .card-content:not(:last-child):after, 
+.card-md > .card-content:not(:last-child):after, 
+.card-lg > .card-content:not(:last-child):after, 
+.card-xl > .card-content:not(:last-child):after
+ {
+    background-color: whitesmoke!important;
+}
+
+/* Forms */
+section > .page-header, h3.section-header {
+    background: #ffd8a8;
+    border-top: 5px solid #faaf34;
+    padding: 15px 10px;
+    margin-bottom: 5px;
+    font-weight: normal;
+    color: #777;
+}
+
+
+

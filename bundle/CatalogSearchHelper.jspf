@@ -1,0 +1,250 @@
+<%@page import="com.google.common.collect.ComparisonChain" %>
+<%@page import="com.google.common.collect.Ordering" %>
+<%@page import="com.google.common.collect.Lists" %>
+<%@page import="com.google.common.base.Function" %>
+<%-- Helper for searching through the forms of a given kapp. --%>
+<%!
+    public static class CatalogSearchHelper {
+    
+        public CatalogSearchHelper() {}
+        
+        /**
+         * Returns full list of WeightedForms that match all words in the query.
+         * If pageSize is passed in, returns 
+         */
+        public List<WeightedForm> search(List<Form> forms, String query) {
+            return search(forms, query, 0, 0);
+        }
+    
+        /**
+         * Returns a list of WeightedForms that match all words in the query.
+         * If pageSize is passed in, returns number of results equal to pageSize. If invalid, returns all records up to the end.
+         * If offset is passed in, returns results starting at the offset position. If invalid, starts at position 0.
+         */
+        public List<WeightedForm> search(List<Form> forms, String query, int pageSize, int offset) {
+            // If forms is null or query is null/empty, return empty list
+            if (forms == null || Text.isBlank(query)){
+                return new ArrayList<WeightedForm>();
+            }
+            // Breaks query parameter into individual words
+            List<String> queryParts = Arrays.asList(query.trim().toLowerCase().split(" "));
+            // Create a TreeSet of WeightedForms to store results. It will be automatically sorted by weight.
+            List<WeightedForm> results = new ArrayList<WeightedForm>();
+            // Iterate through the forms
+            for (Form form : forms) {
+                // Calculate weight of the form
+                double weight = WeightHelper.weigh(queryParts, 
+                        // Form Name (most important)
+                        Arrays.asList(form.getName()), 
+                        // Form Keyword attributes
+                        form.getAttributeValues("Keyword"),
+                        // Form Description
+                        Arrays.asList(form.getDescription()),
+                        // For attributes corresponding to Kapp's Search Attribute attributes
+                        SearchAttributes.INSTANCE.apply(form),
+                        // Category Display names (least important)
+                        Lists.transform(form.getCategories(), CategoryNames.INSTANCE));
+                // If weight is > 0, all query parts were matched, so add form to results set
+                if (weight > 0){
+                    results.add(new WeightedForm(form, weight));
+                }
+                // If weight is 0, at least one query part wasn't matched anywhere, so we ignore the form
+            }
+            // Sort results
+            Collections.sort(results);
+            
+            // If offset is invalid, set to zero
+            if (offset < 0){
+                offset = 0;
+            }
+            // If offset is after the last result, return empty list
+            if (offset >= results.size()){
+                return new ArrayList<WeightedForm>();
+            }
+            // Set pageEnd initially to end of list
+            int pageEnd = results.size();
+            // If pageSize is valid and offset + pageSize <= size of results list, set new pageEnd
+            if (pageSize > 0 && (offset + pageSize) <= results.size()){
+                pageEnd = offset + pageSize;
+            }
+            // Return a sublist of WeightedForm objects stored in resultsList
+            return results.subList(offset, pageEnd);
+        }
+        
+        /**
+         * Function used to transform a List of Category objects into a List of category names (Strings)
+         * Example use: Lists.transform(form.getCategories(), CategoryNames.INSTANCE)
+         */
+        private enum CategoryNames implements Function<Category, String> {
+            INSTANCE;
+            
+            @Override
+            public String apply(Category category) {
+                return Text.defaultIfBlank(category.getAttributeValue("Display Name"), category.getName());
+            }
+        }
+        
+        /**
+         * Function used to transform a Form object into a List of attribute values (Strings)
+         *  which correspond to any predefined Search Attributes
+         * Example use: SearchAttributes.INSTANCE.apply(form),
+         */
+        private enum SearchAttributes implements Function<Form, List<String>> {
+            INSTANCE;
+            
+            @Override
+            public List<String> apply(Form form) {
+                List<String> searchableAttributeValues = new ArrayList<String>();
+                // TODO getAttributeValues should never return null. Remove null checks when core functionality is implemented
+                if (form.getKapp().getAttributeValues("Search Attribute") != null){
+                    for (String searchableAttributeName : form.getKapp().getAttributeValues("Search Attribute")){
+                        searchableAttributeValues.addAll(form.getAttributeValues(searchableAttributeName));
+                    }
+                }
+                return searchableAttributeValues;
+            }
+        }
+    
+        /**
+         * Defines a WeightedForm object which stores a Form and its weight
+         * Implements Comparable to sort WegightedForms by weight
+         */
+        public static class WeightedForm implements Comparable<WeightedForm> {
+            private Form form;
+            private double weight;
+    
+            public WeightedForm(Form form, double weight) {
+                this.form = form;
+                this.weight = weight;
+            }
+    
+            public Form getForm() {
+                return this.form;
+            }
+            
+            public double getWeight() {
+                return this.weight;
+            }
+            
+            public int compareTo(WeightedForm that) {
+                return ComparisonChain.start()
+                        // Compare by weight, highest first
+                        .compare(that.weight, this.weight, Ordering.natural().nullsLast())
+                        // Compare by form name second, alphabetically
+                        .compare(this.getForm().getName().toLowerCase(), that.getForm().getName().toLowerCase(), Ordering.natural().nullsLast())
+                        // Compare by form slug third, alphabetically
+                        .compare(this.getForm().getSlug().toLowerCase(), that.getForm().getSlug().toLowerCase(), Ordering.natural().nullsLast())
+                        .result();
+            }
+        }
+        
+        /**
+         * Helper used to calculate the weight of search results
+         */
+        public static class WeightHelper {
+            
+            // Base weights assigned to matched terms in order of importance by where they're found first
+            public static final int[] LEVEL_WEIGHT = {13, 8, 5, 3, 2, 1};
+            // Modifiers for increasing the weight of a matched term if it is matched mutliple times
+            public static final double MULTI_MATCH_MODIFIER = 1.03;
+            public static final double MINOR_MATCH_MODIFIER = 0.003;
+                    
+            /**
+             * Returns the calculated weight, or 0 if not all search terms are matched
+             *
+             * Parameters
+             *  terms: List of terms to search for. All must be found in at least 1 section
+             *  searchable: This is a vararg, which means you can pass multiple instances of this parameter.
+             *              List of searchable Strings, seperated by section and passed in in order of importance. Everything must be passed as a List<String>
+             *                  Ex: Form name will need to be passed in as a list with a single String value which is the name of the form
+             *
+             * Example call: WeightHelper.weigh(terms,
+             *      nameList, // List containing the form's name. [Most important]
+             *      keywordAttributeList, // List containing the form 'Keyword' attribute values [Medium importance]
+             *      descriptionList // List containing the form's description. [Least Important] );
+             */
+            public static double weigh(List<String> terms, List<String>... searchable){
+                // Create a double array for keeping track of which terms are found where, and how many times
+                // matchCount[termIter][0] = level where term is first found
+                // matchCount[termIter][1] = number of matches found in above level
+                // matchCount[termIter][2] = number of matches found in all remaining levels * each respective level
+                int[][] matchCount = new int[terms.size()][3];
+                
+                // Iterate through all terms
+                for (int termIter = 0; termIter < terms.size(); termIter++){
+                    // Initialize matches for this term to zero
+                    int matches = 0;
+                    int minorMatches = 0;
+                    // Iterate through all 'searchable' levels in order of importance
+                    for (int level = 0; level < searchable.length; level++){
+                        if (searchable[level] == null){ continue; }
+                        // Iterate through each String in the current level
+                        for (String phrase: searchable[level]){
+                            // Count and store the number of matches in current level
+                            matches += countMatches(phrase, terms.get(termIter));
+                        }
+                        // If this term has been matched in the current level for the first time, set level and matches count at that level
+                        if (matchCount[termIter][1] <= 0 && matches > 0){
+                            matchCount[termIter][0] = level;
+                            matchCount[termIter][1] = matches;
+                        }
+                        // Otherwsie, multiple the number of matches by the weight of the current level and store in minorMatches
+                        else {
+                            minorMatches += matches * getWeightByLevel(level);
+                        }
+                        // Reset matches to keep track of lower level matches
+                        matches = 0;
+                    }
+                    // If no matches were found for any single term, return a weight of 0 since this record doesn't match the search query
+                    if (matchCount[termIter][1] <= 0){
+                        return 0;
+                    }
+                    // Set number of matches found in all remaining levels * each respective level
+                    else {
+                        matchCount[termIter][2] = minorMatches;
+                    }
+                }
+                
+                // Initialize the weight to 0
+                double weight = 0;
+                
+                // Iterate through double array of match counts
+                for (int i = 0; i < matchCount.length; i++){
+                    // Get the base weight for the term from the LEVEL_WEIGHT array based on which level the term was first found in
+                    int baseWeight = getWeightByLevel(matchCount[i][0]);
+                    // Calculate the modifier for the base weight based on the number of times the term was matched
+                    double modifier = Math.pow(MULTI_MATCH_MODIFIER, (double)(matchCount[i][1] - 1));
+                    // Calculate the overall modifier for all matches at levels below the level of the first match
+                    double minorModifier = matchCount[i][2] * MINOR_MATCH_MODIFIER;
+                    // Multiple base weight by the modifier, add minorModifier and add the result to the weight
+                    weight += (baseWeight * modifier) + minorModifier;
+                }
+                
+                // Return the weight
+                return weight;
+            }
+            
+            /**
+             * Helper function for counting how many time a string 'sub' appears in another string 'str'
+             */
+            private static int countMatches(String str, String sub){
+                str = str.toLowerCase();
+                sub = sub.toLowerCase();
+                int index = str.indexOf(sub);
+                int count = 0;
+                while (index != -1) {
+                    count++;
+                    index = str.indexOf(sub, index + 1);
+                }
+                return count;
+            }
+            
+            /**
+             * Helper function for getting the weight of a level
+             */
+            private static int getWeightByLevel(int level){
+                return level < LEVEL_WEIGHT.length ? LEVEL_WEIGHT[level] : LEVEL_WEIGHT[LEVEL_WEIGHT.length-1];
+            }
+        }
+    }
+%>

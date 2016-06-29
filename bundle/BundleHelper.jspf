@@ -1,0 +1,87 @@
+<%@page import="org.slf4j.Logger" %>
+<%@page import="org.slf4j.LoggerFactory" %>
+<%@page import="com.kineticdata.core.exceptions.InvalidContentException" %>
+<%!
+    public static class BundleHelper {
+    
+        public static Logger logger = LoggerFactory.getLogger("com.kineticdata.core.BundleInitialization");
+        private Bundle bundle;
+        private Kapp kapp;
+        private Space space;
+    
+        public BundleHelper(Bundle bundle, Kapp kapp, Space space) {
+            this.bundle = bundle;
+            this.kapp = kapp;
+            this.space = space;
+        }
+        
+        /******************************************************************************************
+         *** HEADER NAVIGATION
+         ******************************************************************************************/
+        
+        /**
+         * Returns a list of links to display in the header, which are defined as JSON in the 
+         * Kapps's "Header Navigation List" attribute. If Kapp is null, checks looks at the Space's
+         * "Header Navigation List" attribute. 
+         *
+         * @return List<HeaderNavigationLink> List of link objects
+         */
+        public List<HeaderNavigationLink> getHeaderNavigation(){
+            // Create container to hold links
+            List<HeaderNavigationLink> headerNavigationLinks = new ArrayList<>();
+            // Get value of "Header Navigation List" attribute from kapp if exists, else from space
+            String headerNavigationAttribute = null;
+            if (this.kapp != null){
+                headerNavigationAttribute = this.kapp.getAttributeValue("Header Navigation List");
+            }
+            else {
+                headerNavigationAttribute = this.space.getAttributeValue("Header Navigation List");
+            }
+            // If "Header Navigation List" attribute exists, create links
+            if (headerNavigationAttribute != null){
+                // Get value of "Header Navigation List" attribute and parse into JSON
+                List<LinkedHashMap> headerNavigation = (ArrayList<LinkedHashMap>)Json.parse(headerNavigationAttribute);
+                // Iterate through each link in the JSON array of links
+                for (LinkedHashMap link : headerNavigation){
+                    // If link has a Name, build the link
+                    if (link.get("Name") != null){
+                        // Start path with the space location
+                        String path = this.bundle.getSpaceLocation() + "/";
+                        // If link specifies a Kapp, use that Kapp, otherwise use current Kapp
+                        path += link.get("Kapp") != null ? link.get("Kapp") : this.kapp.getSlug();
+                        // If link specified a Page, use that Page
+                        if (link.get("Page") != null){
+                            path += "?page=" + link.get("Page");
+                        }
+                        // Add link to result list
+                        headerNavigationLinks.add(new HeaderNavigationLink((String)link.get("Name"), path));
+                    }
+                }
+            }
+            // Return links
+            return headerNavigationLinks;
+        }
+        
+        /**
+         * Helper class which defines an instance of a header link.
+         */
+        public class HeaderNavigationLink {
+            private String name;
+            private String path;
+            
+            public HeaderNavigationLink(String name, String path){
+                this.name = name;
+                this.path = path;
+            }
+            
+            public String getName(){
+                return this.name;
+            }
+            
+            public String getPath(){
+                return this.path;
+            }
+        }
+        
+    }
+%>

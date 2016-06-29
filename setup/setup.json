@@ -1,0 +1,442 @@
+{
+    "kappAttributeDefinitions": [
+        {
+            "name": "Company Name",
+            "allowsMultiple": false,
+            "required": false,
+            "description": null,
+            "values": [
+                "CapGemini"
+            ]
+        },
+        {
+            "name": "Logo Url",
+            "allowsMultiple": false,
+            "required": false,
+            "description": null,
+            "values": [
+                "http://dir.texas.gov/img/dir-logo-print.png"
+            ]
+        },
+        {
+            "name": "Shared Bridged Resource Form Slug",
+            "allowsMultiple": false,
+            "required": false,
+            "description": null,
+            "values": [
+                "shared-resources"
+            ]
+        }
+    ],
+    "formAttributeDefinitions": [
+        {
+            "name": "Image",
+            "allowsMultiple": false,
+            "required": false,
+            "description": null
+        },
+        {
+            "name": "Task Server Url",
+            "allowsMultiple": false,
+            "required": false,
+            "description": null
+        },
+        {
+            "name": "Task Source Name",
+            "allowsMultiple": false,
+            "required": false,
+            "description": null
+        }
+    ],
+    "userAttributeDefinitions": [
+        {
+            "name": "ARS Login",
+            "allowsMultiple": false,
+            "required": false,
+            "description": null
+        },
+        {
+            "name": "CTM People Id",
+            "allowsMultiple": false,
+            "required": false,
+            "description": null
+        }
+    ],
+    "bridges": [
+        {
+            "name": "Core Bridge",
+            "status": "Active",
+            "url": "http://localhost:8080/kinetic-bridgehub/app/api/v1/bridges/steph-s-space/"
+        },
+        {
+            "name": "DemoRemedy",
+            "status": "Active",
+            "url": "http://democe.kineticdata.com:8080/kinetic-bridgehub/app/api/v1/bridges/ars/"
+        },
+        {
+            "name": "Emu",
+            "status": "Active",
+            "url": "http://emu.kineticdata.com:8089/kineticArsBridge/api/1.0/"
+        }
+    ],
+    "bridgeModels": [
+        {
+            "name": "CMDB ComputerSystem",
+            "status": "Active",
+            "activeMappingName": "CMDB Computer Systems 2",
+            "attributes": [
+                {
+                    "name": "HostName"
+                },
+                {
+                    "name": "isVirtual"
+                },
+                {
+                    "name": "SystemType"
+                },
+                {
+                    "name": "TotalPhysicalMemory"
+                },
+                {
+                    "name": "VirtualSystemType"
+                }
+            ],
+            "qualifications": [
+                {
+                    "name": "By Company",
+                    "resultType": "Multiple",
+                    "parameters": [
+                        {
+                            "name": "Company",
+                            "notes": null
+                        }
+                    ]
+                }
+            ],
+            "mappings": [
+                {
+                    "name": "CMDB Computer Systems 2",
+                    "bridgeName": "DemoRemedy",
+                    "structure": "BMC.CORE:BMC_ComputerSystem",
+                    "attributes": [
+                        {
+                            "name": "HostName",
+                            "structureField": "${fields('HostName')}"
+                        },
+                        {
+                            "name": "isVirtual",
+                            "structureField": "${fields('isVirtual')}"
+                        },
+                        {
+                            "name": "SystemType",
+                            "structureField": "${fields('SystemType')}"
+                        },
+                        {
+                            "name": "TotalPhysicalMemory",
+                            "structureField": "${fields('TotalPhysicalMemory')}"
+                        },
+                        {
+                            "name": "VirtualSystemType",
+                            "structureField": "${fields('VirtualSystemType')}"
+                        }
+                    ],
+                    "qualifications": [
+                        {
+                            "name": "By Company",
+                            "query": "'DatasetId' = \"BMC.ASSET\" AND 'Company' = \"${parameters('Company')}\""
+                        }
+                    ]
+                }
+            ]
+        },
+        {
+            "name": "CTM Permission Groups",
+            "status": "Active",
+            "activeMappingName": "CTM Permission Groups",
+            "attributes": [
+                {
+                    "name": "Company Name"
+                }
+            ],
+            "qualifications": [
+                {
+                    "name": "By User",
+                    "resultType": "Multiple",
+                    "parameters": [
+                        {
+                            "name": "User",
+                            "notes": null
+                        }
+                    ]
+                }
+            ],
+            "mappings": [
+                {
+                    "name": "CTM Permission Groups",
+                    "bridgeName": "Emu",
+                    "structure": "CTM:People Permission Groups",
+                    "attributes": [
+                        {
+                            "name": "Company Name",
+                            "structureField": "${fields('Company')}"
+                        }
+                    ],
+                    "qualifications": [
+                        {
+                            "name": "By User",
+                            "query": "'Permission Group Type' = \"Data Access\" AND 'Person ID' = \"${parameters('User')}\" AND 'Status' = \"Enabled\""
+                        }
+                    ]
+                }
+            ]
+        },
+        {
+            "name": "CTM Person",
+            "status": "Active",
+            "activeMappingName": "CTM Person",
+            "attributes": [
+                {
+                    "name": "Company Name"
+                },
+                {
+                    "name": "Person Id"
+                }
+            ],
+            "qualifications": [
+                {
+                    "name": "By User",
+                    "resultType": "Single",
+                    "parameters": [
+                        {
+                            "name": "User",
+                            "notes": null
+                        }
+                    ]
+                }
+            ],
+            "mappings": [
+                {
+                    "name": "CTM Person",
+                    "bridgeName": "Emu",
+                    "structure": "CTM:People",
+                    "attributes": [
+                        {
+                            "name": "Person Id",
+                            "structureField": "${fields('Person ID')}"
+                        },
+                        {
+                            "name": "Company Name",
+                            "structureField": "${fields('Company')}"
+                        }
+                    ],
+                    "qualifications": [
+                        {
+                            "name": "By User",
+                            "query": "'Remedy Login ID' = \"${parameters('User')}\""
+                        }
+                    ]
+                }
+            ]
+        }
+    ],
+    "forms": [
+        {
+            "name": "Fully Managed",
+            "description": null,
+            "slug": "fully-managed",
+            "type": "Service",
+            "status": "Active",
+            "anonymous": false,
+            "customHeadContent": null,
+            "notes": null,
+            "submissionLabelExpression": null,
+            "attributes": [],
+            "bridgedResources": [],
+            "categorizations": [],
+            "pages": [
+                {
+                    "elements": [
+                        {
+                            "type": "button",
+                            "label": "Submit",
+                            "name": "Submit Button",
+                            "visible": true,
+                            "enabled": true,
+                            "renderType": "submit-page",
+                            "renderAttributes": {}
+                        }
+                    ],
+                    "events": [],
+                    "name": "Page",
+                    "renderType": "submittable",
+                    "type": "page",
+                    "advanceCondition": null,
+                    "displayCondition": null,
+                    "displayPage": null
+                }
+            ],
+            "securityPolicies": []
+        },
+        {
+            "name": "Semi Managed",
+            "description": null,
+            "slug": "semi-managed",
+            "type": "Service",
+            "status": "Active",
+            "anonymous": false,
+            "customHeadContent": null,
+            "notes": null,
+            "submissionLabelExpression": null,
+            "attributes": [],
+            "bridgedResources": [],
+            "categorizations": [],
+            "pages": [],
+            "securityPolicies": []
+        },
+        {
+            "name": "Shared Resources",
+            "description": "Form for adding bridges or other resources that need to be exposed in the Kapp",
+            "slug": "shared-resources",
+            "type": "Service",
+            "status": "Active",
+            "anonymous": false,
+            "customHeadContent": null,
+            "notes": null,
+            "submissionLabelExpression": null,
+            "attributes": [],
+            "bridgedResources": [
+                {
+                    "name": "CMDB ComputerSystem",
+                    "model": "CMDB ComputerSystem",
+                    "qualification": "By Company",
+                    "status": "Active",
+                    "parameters": [
+                        {
+                            "name": "Company",
+                            "mapping": "${values('Company')}"
+                        }
+                    ]
+                },
+                {
+                    "name": "CTM Permission Groups",
+                    "model": "CTM Permission Groups",
+                    "qualification": "By User",
+                    "status": "Active",
+                    "parameters": [
+                        {
+                            "name": "User",
+                            "mapping": "${identity('attribute:CTM People Id')}"
+                        }
+                    ]
+                },
+                {
+                    "name": "CTM Person",
+                    "model": "CTM Person",
+                    "qualification": "By User",
+                    "status": "Active",
+                    "parameters": [
+                        {
+                            "name": "User",
+                            "mapping": "${identity('attribute:ARS Login')}"
+                        }
+                    ]
+                }
+            ],
+            "categorizations": [],
+            "pages": [
+                {
+                    "elements": [
+                        {
+                            "type": "field",
+                            "name": "User",
+                            "label": "User",
+                            "key": "f2",
+                            "defaultValue": null,
+                            "defaultResourceName": null,
+                            "visible": true,
+                            "enabled": true,
+                            "required": false,
+                            "requiredMessage": null,
+                            "omitWhenHidden": null,
+                            "pattern": null,
+                            "constraints": [],
+                            "events": [],
+                            "renderAttributes": {},
+                            "dataType": "string",
+                            "renderType": "text",
+                            "rows": 1
+                        },
+                        {
+                            "type": "field",
+                            "name": "Company",
+                            "label": "Company",
+                            "key": "f3",
+                            "defaultValue": null,
+                            "defaultResourceName": null,
+                            "visible": true,
+                            "enabled": true,
+                            "required": false,
+                            "requiredMessage": null,
+                            "omitWhenHidden": null,
+                            "pattern": null,
+                            "constraints": [],
+                            "events": [],
+                            "renderAttributes": {},
+                            "dataType": "string",
+                            "renderType": "text",
+                            "rows": 1
+                        },
+                        {
+                            "type": "field",
+                            "name": "Status",
+                            "label": null,
+                            "key": "f1",
+                            "defaultValue": null,
+                            "defaultResourceName": null,
+                            "visible": true,
+                            "enabled": true,
+                            "required": false,
+                            "requiredMessage": null,
+                            "omitWhenHidden": null,
+                            "pattern": null,
+                            "constraints": [],
+                            "events": [],
+                            "renderAttributes": {},
+                            "dataType": "string",
+                            "renderType": "radio",
+                            "choicesResourceName": null,
+                            "choicesRunIf": null,
+                            "choices": [
+                                {
+                                    "label": "Active",
+                                    "value": "active"
+                                },
+                                {
+                                    "label": "Inactive",
+                                    "value": "inactive"
+                                }
+                            ]
+                        },
+                        {
+                            "type": "button",
+                            "label": "Submit",
+                            "name": "Submit Button",
+                            "visible": true,
+                            "enabled": true,
+                            "renderType": "submit-page",
+                            "renderAttributes": {}
+                        }
+                    ],
+                    "events": [],
+                    "name": "Shared Resources",
+                    "renderType": "submittable",
+                    "type": "page",
+                    "advanceCondition": null,
+                    "displayCondition": null,
+                    "displayPage": null
+                }
+            ],
+            "securityPolicies": []
+        }
+    ]
+}
