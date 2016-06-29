@@ -6,10 +6,10 @@
             <a class="navbar-brand" href="${not empty kapp ? bundle.kappLocation : bundle.spaceLocation}">
                 <c:choose>
                     <c:when test="${space.hasAttribute('Logo Url')}">
-                        <img src="${kapp.getAttributeValue('Logo Url')}" alt="logo">
+                        <img src="${space.getAttributeValue('Logo Url')}" alt="logo">
                     </c:when>
                     <c:when test="${not empty kapp && kapp.hasAttribute('Logo Url')}">
-                        <img src="${space.getAttributeValue('Logo Url')}" alt="logo">
+                        <img src="${kapp.getAttributeValue('Logo Url')}" alt="logo">
                     </c:when>
                     <c:when test="${not empty kapp}">
                         <i class="fa fa-home"></i> ${text.escape(kapp.name)}
