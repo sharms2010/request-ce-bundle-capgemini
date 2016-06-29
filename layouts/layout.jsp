@@ -16,7 +16,9 @@
         <link href="${bundle.location}/libraries/font-awesome/css/font-awesome.css" rel="stylesheet" type="text/css"/>
         <bundle:stylepack>
             <bundle:style src="${bundle.location}/libraries/bootstrap/css/bootstrap.css"/>
-            <bundle:style src="${bundle.location}/libraries/datatables/datatables.css"/>
+            <%--Temporary workaround due to a script packing error.--%>
+            <%--<bundle:style src="${bundle.location}/libraries/datatables/datatables.css"/>--%>
+            <bundle:style src="${bundle.location}/libraries/jquery-datatables/DataTables-1.10.12/css/jquery.dataTables.css"/>
             <bundle:style src="${bundle.location}/libraries/notifie/jquery.notifie.css"/>
             <bundle:style src="${bundle.location}/css/master.css"/>
             <bundle:style src="${bundle.location}/css/custom.css"/>
@@ -26,7 +28,9 @@
             <bundle:script src="${bundle.location}/libraries/underscore/underscore.js"/>
             <bundle:script src="${bundle.location}/libraries/bootstrap/js/bootstrap.js"/>
             <bundle:script src="${bundle.location}/libraries/moment/moment-with-locales.js"/>
-            <bundle:script src="${bundle.location}/libraries/datatables/datatables.js"/>
+            <%--Temporary workaround due to a script packing error.--%>
+            <%--<bundle:script src="${bundle.location}/libraries/datatables/datatables.js"/>--%>
+            <bundle:script src="${bundle.location}/libraries/jquery-datatables/DataTables-1.10.12/js/jquery.dataTables.js"/>
             <bundle:script src="${bundle.location}/libraries/kd-search/search.js"/>
             <bundle:script src="${bundle.location}/libraries/notifie/jquery.notifie.js"/>
             <bundle:script src="${bundle.location}/libraries/typeahead/typeahead.min.js"/>

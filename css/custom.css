@@ -105,5 +105,9 @@ section > .page-header, h3.section-header {
     color: #777;
 }
 
+.cloud-offerings{
+    position: inherit;
+}
+
 
 
